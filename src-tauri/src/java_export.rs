@@ -297,6 +297,19 @@ pub fn build_java_121_give_command(project: &ItemProject) -> String {
             "minecraft:attribute_modifiers=[{}]",
             modifiers.join(",")
         ));
+
+        let any_right_click = project
+            .powers
+            .iter()
+            .any(|p| p.trigger == PowerTrigger::OnRightClick);
+        let is_shield =
+            project.category == ItemCategory::Armor && project.armor_slot == ArmorSlot::Shield;
+        if any_right_click && !is_shield {
+            comps.push(
+                "minecraft:food={nutrition:0,saturation:0.0,can_always_eat:true,eat_seconds:3600.0}"
+                    .to_string(),
+            );
+        }
     } else {
         let nutrition = (project.stats.hunger_restored as u32) * 2;
         let saturation = (nutrition as f32) * 0.6;
@@ -457,13 +470,28 @@ fn build_on_right_click_mcfunction(project: &ItemProject) -> String {
     ];
 
     if has_rc("launch_fireball") {
-        lines.push(
-            "execute at @s anchored eyes run summon minecraft:small_fireball ^ ^ ^1.2 {Fire:20s}"
-                .to_string(),
-        );
-        lines.push(
+        lines.extend([
+            "scoreboard objectives add forjix_vec dummy".to_string(),
+            "execute at @s anchored eyes run summon minecraft:small_fireball ^ ^-0.1 ^1.2 {Tags:[\"forjix_fb_init\"]}".to_string(),
+            "execute at @s anchored eyes positioned ^ ^ ^1 summon minecraft:marker run tag @s add forjix_aim_end".to_string(),
+            "execute at @s anchored eyes positioned ^ ^ ^0 summon minecraft:marker run tag @s add forjix_aim_origin".to_string(),
+            "execute store result score #dx forjix_vec run data get entity @e[type=minecraft:marker,tag=forjix_aim_end,limit=1] Pos[0] 1000".to_string(),
+            "execute store result score #ox forjix_vec run data get entity @e[type=minecraft:marker,tag=forjix_aim_origin,limit=1] Pos[0] 1000".to_string(),
+            "scoreboard players operation #dx forjix_vec -= #ox forjix_vec".to_string(),
+            "execute store result score #dy forjix_vec run data get entity @e[type=minecraft:marker,tag=forjix_aim_end,limit=1] Pos[1] 1000".to_string(),
+            "execute store result score #oy forjix_vec run data get entity @e[type=minecraft:marker,tag=forjix_aim_origin,limit=1] Pos[1] 1000".to_string(),
+            "scoreboard players operation #dy forjix_vec -= #oy forjix_vec".to_string(),
+            "execute store result score #dz forjix_vec run data get entity @e[type=minecraft:marker,tag=forjix_aim_end,limit=1] Pos[2] 1000".to_string(),
+            "execute store result score #oz forjix_vec run data get entity @e[type=minecraft:marker,tag=forjix_aim_origin,limit=1] Pos[2] 1000".to_string(),
+            "scoreboard players operation #dz forjix_vec -= #oz forjix_vec".to_string(),
+            "execute as @e[type=minecraft:small_fireball,tag=forjix_fb_init] store result entity @s Motion[0] double 0.0018 run scoreboard players get #dx forjix_vec".to_string(),
+            "execute as @e[type=minecraft:small_fireball,tag=forjix_fb_init] store result entity @s Motion[1] double 0.0018 run scoreboard players get #dy forjix_vec".to_string(),
+            "execute as @e[type=minecraft:small_fireball,tag=forjix_fb_init] store result entity @s Motion[2] double 0.0018 run scoreboard players get #dz forjix_vec".to_string(),
+            "tag @e[type=minecraft:small_fireball,tag=forjix_fb_init] remove forjix_fb_init".to_string(),
+            "kill @e[type=minecraft:marker,tag=forjix_aim_end]".to_string(),
+            "kill @e[type=minecraft:marker,tag=forjix_aim_origin]".to_string(),
             "execute at @s run particle minecraft:flame ~ ~1.5 ~ 0.3 0.3 0.3 0.05 12".to_string(),
-        );
+        ]);
     }
     if has_rc("teleport_forward") {
         lines.push("execute at @s anchored eyes run tp @s ^ ^ ^8".to_string());
@@ -472,8 +500,7 @@ fn build_on_right_click_mcfunction(project: &ItemProject) -> String {
         );
     }
     if has_rc("heal_aura") {
-        lines.push("effect give @s minecraft:instant_health 1 1 true".to_string());
-        lines.push("effect give @e[distance=0.1..6] minecraft:instant_health 1 0 true".to_string());
+        lines.push("effect give @a[distance=..6] minecraft:instant_health 1 1 true".to_string());
         lines.push("particle minecraft:heart ~ ~1.5 ~ 0.4 0.4 0.4 0.02 10".to_string());
     }
 

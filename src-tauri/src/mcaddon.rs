@@ -526,14 +526,10 @@ pub fn generate_behavior_script_js(project: &ItemProject) -> String {
         if has_right_click("heal_aura") {
             js.push_str(
                 "  try {\n\
-                 \x20   const health = player.getComponent(\"minecraft:health\");\n\
-                 \x20   if (health) {\n\
-                 \x20     health.setCurrentValue(Math.min(health.effectiveMax, health.currentValue + 6));\n\
-                 \x20   }\n\
-                 \x20   for (const nearby of player.dimension.getEntities({ location: player.location, maxDistance: 6, excludeTypes: [] })) {\n\
-                 \x20     if (nearby.id === player.id) continue;\n\
-                 \x20     const nh = nearby.getComponent(\"minecraft:health\");\n\
-                 \x20     if (nh) nh.setCurrentValue(Math.min(nh.effectiveMax, nh.currentValue + 4));\n\
+                 \x20   for (const ally of player.dimension.getPlayers({ location: player.location, maxDistance: 6 })) {\n\
+                 \x20     const nh = ally.getComponent(\"minecraft:health\");\n\
+                 \x20     const bonus = ally.id === player.id ? 6 : 4;\n\
+                 \x20     if (nh) nh.setCurrentValue(Math.min(nh.effectiveMax, nh.currentValue + bonus));\n\
                  \x20   }\n\
                  \x20 } catch {}\n",
             );
@@ -669,10 +665,10 @@ pub fn build_bp_item_json(project: &ItemProject) -> Value {
         let slot = match project.category {
             ItemCategory::Tool => "pickaxe",
             ItemCategory::Armor => match project.armor_slot {
-                ArmorSlot::Helmet => "helmet",
-                ArmorSlot::Chestplate => "chestplate",
-                ArmorSlot::Leggings => "leggings",
-                ArmorSlot::Boots => "boots",
+                ArmorSlot::Helmet => "armor_head",
+                ArmorSlot::Chestplate => "armor_torso",
+                ArmorSlot::Leggings => "armor_legs",
+                ArmorSlot::Boots => "armor_feet",
                 ArmorSlot::Shield => "shield",
             },
             _ => "sword",
@@ -684,6 +680,37 @@ pub fn build_bp_item_json(project: &ItemProject) -> Value {
                 "value": project.stats.enchantability.clamp(1, 30)
             }),
         );
+
+        if project.category == ItemCategory::Armor && project.armor_slot != ArmorSlot::Shield {
+            let wearable_slot = match project.armor_slot {
+                ArmorSlot::Helmet => "slot.armor.head",
+                ArmorSlot::Chestplate => "slot.armor.chest",
+                ArmorSlot::Leggings => "slot.armor.legs",
+                ArmorSlot::Boots => "slot.armor.feet",
+                ArmorSlot::Shield => "slot.weapon.offhand",
+            };
+            components.insert(
+                "minecraft:wearable".to_string(),
+                json!({
+                    "slot": wearable_slot,
+                    "protection": (project.stats.defense.round() as i32).clamp(1, 20)
+                }),
+            );
+        }
+
+        let any_right_click = project
+            .powers
+            .iter()
+            .any(|p| p.trigger == PowerTrigger::OnRightClick);
+        if any_right_click {
+            components.insert(
+                "minecraft:cooldown".to_string(),
+                json!({
+                    "category": format!("forjix_{slug}"),
+                    "duration": 0.75
+                }),
+            );
+        }
     }
 
     if is_food {
@@ -1174,5 +1201,55 @@ mod tests {
         );
 
         let _ = std::fs::remove_file(&written_path);
+    }
+
+    #[test]
+    fn bedrock_armor_uses_valid_enchantable_and_wearable_slots_and_right_click_cooldown() {
+        let project = ItemProject {
+            id: "armor-rc-test".to_string(),
+            name: "Coroană Regală".to_string(),
+            slug: "coroana_regala".to_string(),
+            mode: EditorMode::Voxel,
+            grid_size: 16,
+            pixels: vec![None; 256],
+            voxels: vec![],
+            category: ItemCategory::Armor,
+            rarity: ItemRarity::Legendary,
+            armor_slot: ArmorSlot::Helmet,
+            stats: ItemStats {
+                attack_damage: 4.0,
+                attack_speed: 1.6,
+                attack_speed_tier: AttackSpeedTier::Normal,
+                durability: 1200,
+                unbreakable: false,
+                movement_speed: 0,
+                mining_speed: 1.0,
+                defense: 6.0,
+                enchantability: 25,
+                hunger_restored: 4,
+                eat_status_effect: EatStatusEffect::None,
+            },
+            powers: vec![ItemPower {
+                id: "on_right_click:heal_aura".to_string(),
+                trigger: PowerTrigger::OnRightClick,
+                effect: "heal_aura".to_string(),
+                amplifier: 1,
+                duration_seconds: 1,
+            }],
+        };
+
+        let item_val = build_bp_item_json(&project);
+        let comps = &item_val["minecraft:item"]["components"];
+        assert_eq!(comps["minecraft:enchantable"]["slot"], json!("armor_head"));
+        assert_eq!(
+            comps["minecraft:wearable"]["slot"],
+            json!("slot.armor.head")
+        );
+        assert_eq!(comps["minecraft:wearable"]["protection"], json!(6));
+        assert!(comps.get("minecraft:cooldown").is_some());
+
+        let script = generate_behavior_script_js(&project);
+        assert!(script.contains("getPlayers("));
+        assert!(!script.contains("excludeTypes: []"));
     }
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type {
+  ArmorSlot,
   HexColor,
   ItemCategory,
   ItemPower,
@@ -17,6 +18,7 @@ export interface VoxelPresetDefinition {
   icon: string;
   defaultName: Record<Language, string>;
   category: ItemCategory;
+  armorSlot?: ArmorSlot;
   rarity: ItemRarity;
   stats: ItemStats;
   powers: ItemPower[];
@@ -324,7 +326,8 @@ export const VOXEL_PRESETS: readonly VoxelPresetDefinition[] = [
     id: 'royal_crown',
     icon: '👑',
     defaultName: { ro: 'Coroană Regală', en: 'Royal Crown' },
-    category: 'artifact',
+    category: 'armor',
+    armorSlot: 'helmet',
     rarity: 'legendary',
     stats: {
       attackDamage: 4,

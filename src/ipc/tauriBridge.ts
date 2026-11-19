@@ -146,6 +146,17 @@ export function buildJava121GiveCommandClient(project: ItemProject): string {
       );
     }
     comps.push(`minecraft:attribute_modifiers=[${mods.join(',')}]`);
+
+    const anyRightClick = normalized.powers.some(
+      (p) => p.trigger === 'on_right_click'
+    );
+    const isShield =
+      normalized.category === 'armor' && normalized.armorSlot === 'shield';
+    if (anyRightClick && !isShield) {
+      comps.push(
+        'minecraft:food={nutrition:0,saturation:0.0,can_always_eat:true,eat_seconds:3600.0}'
+      );
+    }
   } else {
     const nutrition = normalized.stats.hungerRestored * 2;
     const saturation = (nutrition * 0.6).toFixed(1);

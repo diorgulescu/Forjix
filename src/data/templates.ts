@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type {
+  ArmorSlot,
   GridSize,
   HexColor,
   ItemCategory,
@@ -16,6 +17,7 @@ export interface StarterTemplateDefinition {
   id: StarterTemplateId;
   defaultName: Record<Language, string>;
   category: ItemCategory;
+  armorSlot?: ArmorSlot;
   rarity: ItemRarity;
   stats: ItemStats;
   powers: ItemPower[];
@@ -231,7 +233,8 @@ export const STARTER_TEMPLATES: readonly StarterTemplateDefinition[] = [
   {
     id: 'shield',
     defaultName: { ro: 'Scut Regal', en: 'Royal Shield' },
-    category: 'artifact',
+    category: 'armor',
+    armorSlot: 'shield',
     rarity: 'epic',
     stats: {
       attackDamage: 4,

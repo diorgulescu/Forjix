@@ -159,4 +159,23 @@ describe('Export & Project Serialization', () => {
     const shieldCmd = buildJava121GiveCommandClient(shieldProj);
     expect(shieldCmd.startsWith('/give @p minecraft:shield[')).toBe(true);
   });
+
+  it('attaches right-click usable component on Java 1.21+ handheld items with OnRightClick powers', () => {
+    const proj = createInitialProject('classic_sword', 'en');
+    const wandWithRightClick = normalizeProjectLocally({
+      ...proj,
+      category: 'weapon',
+      powers: [
+        {
+          id: 'on_right_click:launch_fireball',
+          trigger: 'on_right_click',
+          effect: 'launch_fireball',
+          amplifier: 1,
+          durationSeconds: 1,
+        },
+      ],
+    });
+    const cmd = buildJava121GiveCommandClient(wandWithRightClick);
+    expect(cmd).toContain('eat_seconds:3600.0');
+  });
 });

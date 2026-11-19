@@ -41,6 +41,12 @@ jobs:
       - name: Build production frontend bundle
         run: npm run build
 
+      - name: Install Playwright Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Run Playwright E2E smoke tests
+        run: npm run test:e2e
+
   rust:
     name: Rust & Tauri v2 (${{ matrix.os }})
     runs-on: ${{ matrix.os }}

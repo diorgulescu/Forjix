@@ -17,6 +17,7 @@ export type ItemCategory =
 export type PrimaryItemCategory =
   | 'weapon'
   | 'tool'
+  | 'armor'
   | 'consumable'
   | 'artifact';
 

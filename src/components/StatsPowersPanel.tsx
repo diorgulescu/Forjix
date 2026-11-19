@@ -58,6 +58,7 @@ const CATEGORY_OPTIONS: ReadonlyArray<{
 }> = [
   { id: 'weapon', icon: '⚔️' },
   { id: 'tool', icon: '⛏️' },
+  { id: 'armor', icon: '🛡️' },
   { id: 'consumable', icon: '🍎' },
   { id: 'artifact', icon: '🔮' },
 ];
@@ -106,11 +107,8 @@ export const StatsPowersPanel: React.FC<StatsPowersPanelProps> = ({
   const hasHalfHeart = stats.attackDamage % 2 === 1;
   const totalHeartsNumber = stats.attackDamage / 2;
 
-  // Normalize legacy 'uncommon' highlight to 'rare' only for active-check fallback if needed
   const normalizedCategory: PrimaryItemCategory =
-    project.category === 'armor' || project.category === 'wand'
-      ? 'artifact'
-      : project.category;
+    project.category === 'wand' ? 'artifact' : project.category;
 
   const normalizedRarity: PrimaryItemRarity =
     project.rarity === 'uncommon' ? 'common' : project.rarity;
