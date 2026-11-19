@@ -33,6 +33,13 @@ export type PrimaryItemRarity =
   | 'epic'
   | 'legendary';
 
+export type ArmorSlot =
+  | 'helmet'
+  | 'chestplate'
+  | 'leggings'
+  | 'boots'
+  | 'shield';
+
 export type AttackSpeedTier = 'slow' | 'normal' | 'fast' | 'lightning';
 
 export type EatStatusEffect =
@@ -64,7 +71,15 @@ export type PassiveHeldEffectId =
   | 'fire_resistance'
   | 'glowing_aura';
 
-export type SpecialPowerEffectId = OnHitEffectId | PassiveHeldEffectId;
+export type OnRightClickEffectId =
+  | 'launch_fireball'
+  | 'teleport_forward'
+  | 'heal_aura';
+
+export type SpecialPowerEffectId =
+  | OnHitEffectId
+  | PassiveHeldEffectId
+  | OnRightClickEffectId;
 
 /**
  * Hex color string formatted as #RRGGBB.
@@ -130,6 +145,8 @@ export interface ItemProject {
   voxels: Voxel[];
   category: ItemCategory;
   rarity: ItemRarity;
+  /** Armor slot — only relevant when category is 'armor' */
+  armorSlot: ArmorSlot;
   stats: ItemStats;
   powers: ItemPower[];
 }

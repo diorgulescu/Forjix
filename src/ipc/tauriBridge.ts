@@ -3,6 +3,7 @@
 import { invoke, isTauri } from '@tauri-apps/api/core';
 import { open, save } from '@tauri-apps/plugin-dialog';
 import type {
+  ArmorSlot,
   ItemCategory,
   ItemProject,
   ItemRarity,
@@ -72,7 +73,7 @@ function javaRarityColorName(rarity: ItemRarity): string {
   }
 }
 
-function javaBaseItemId(category: ItemCategory): string {
+function javaBaseItemId(category: ItemCategory, armorSlot: ArmorSlot = 'chestplate'): string {
   switch (category) {
     case 'weapon':
       return 'minecraft:diamond_sword';
@@ -81,7 +82,19 @@ function javaBaseItemId(category: ItemCategory): string {
     case 'consumable':
       return 'minecraft:golden_apple';
     case 'armor':
-      return 'minecraft:shield';
+      switch (armorSlot) {
+        case 'helmet':
+          return 'minecraft:iron_helmet';
+        case 'chestplate':
+          return 'minecraft:iron_chestplate';
+        case 'leggings':
+          return 'minecraft:iron_leggings';
+        case 'boots':
+          return 'minecraft:iron_boots';
+        case 'shield':
+          return 'minecraft:shield';
+      }
+      return 'minecraft:iron_chestplate';
     case 'wand':
     case 'artifact':
       return 'minecraft:blaze_rod';
@@ -95,7 +108,7 @@ function javaBaseItemId(category: ItemCategory): string {
 export function buildJava121GiveCommandClient(project: ItemProject): string {
   const normalized = normalizeProjectLocally(project);
   const slug = normalized.slug;
-  const baseItem = javaBaseItemId(normalized.category);
+  const baseItem = javaBaseItemId(normalized.category, normalized.armorSlot ?? 'chestplate');
   const isFood = normalized.category === 'consumable';
   const displayName = normalized.name.trim() || 'Forjix Item';
 
@@ -103,7 +116,9 @@ export function buildJava121GiveCommandClient(project: ItemProject): string {
     text: displayName,
     color: javaRarityColorName(normalized.rarity),
     italic: false,
-  }).replace(/'/g, "\\'");
+  })
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, "\\'");
 
   const comps: string[] = [
     `minecraft:item_model="forjix:${slug}"`,
@@ -180,6 +195,7 @@ export function normalizeProjectLocally(project: ItemProject): ItemProject {
   return {
     ...project,
     slug,
+    armorSlot: project.armorSlot ?? 'chestplate',
     pixels: normalizedPixels,
     voxels,
     stats: clampItemStats({

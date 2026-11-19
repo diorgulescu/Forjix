@@ -10,6 +10,12 @@ import {
   computeItemGripTransform,
 } from '../three/playerArm';
 import {
+  buildGhostPreview,
+  buildVoxelSceneScaffold,
+  DEFAULT_CAM_BUILD,
+  DEFAULT_CAM_HELD,
+} from '../three/voxelSceneHelpers';
+import {
   buildSculptedVoxelGeometry,
   type QuadHitMetadata,
 } from '../three/voxelMesh';
@@ -44,29 +50,6 @@ interface VoxelSculptorPaneProps {
   onCommitVoxels: (nextVoxels: Voxel[]) => void;
   onSelectPreset: (presetId: VoxelPresetId, lang: Language) => void;
   onPickColor: (hex: HexColor) => void;
-}
-
-const DEFAULT_CAM_BUILD: [number, number, number] = [1.25, 1.05, 1.45];
-const DEFAULT_CAM_HELD: [number, number, number] = [1.45, 0.68, 1.75];
-
-function createBuildPlateTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 16;
-  canvas.height = 16;
-  const ctx = canvas.getContext('2d');
-  if (ctx) {
-    for (let z = 0; z < 16; z++) {
-      for (let x = 0; x < 16; x++) {
-        ctx.fillStyle = (x + z) % 2 === 0 ? '#1B2236' : '#232C45';
-        ctx.fillRect(x, z, 1, 1);
-      }
-    }
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.NearestFilter;
-  tex.minFilter = THREE.NearestFilter;
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
 }
 
 export const VoxelSculptorPane: React.FC<VoxelSculptorPaneProps> = ({
@@ -168,64 +151,12 @@ export const VoxelSculptorPane: React.FC<VoxelSculptorPaneProps> = ({
     rimLight.position.set(-2.5, 1.8, -2.4);
     scene.add(rimLight);
 
-    // 16x16 Build Plate Group at worldY = -0.5
-    const buildPlateGroup = new THREE.Group();
-    const plateTex = createBuildPlateTexture();
-    const plateGeo = new THREE.PlaneGeometry(1.0, 1.0);
-    plateGeo.rotateX(-Math.PI / 2);
-    const plateMat = new THREE.MeshBasicMaterial({
-      map: plateTex,
-      side: THREE.DoubleSide,
-    });
-    const plateCollider = new THREE.Mesh(plateGeo, plateMat);
-    plateCollider.position.y = -0.5005;
-    buildPlateGroup.add(plateCollider);
-
-    const gridHelper = new THREE.GridHelper(1.0, 16, 0x45588a, 0x2f3c61);
-    gridHelper.position.y = -0.5;
-    buildPlateGroup.add(gridHelper);
-
-    // Faint 16x16x16 bounding cage wireframe
-    const cageGeo = new THREE.BoxGeometry(1.0, 1.0, 1.0);
-    const cageEdges = new THREE.EdgesGeometry(cageGeo);
-    const cageLine = new THREE.LineSegments(
-      cageEdges,
-      new THREE.LineBasicMaterial({
-        color: 0x2d3a5e,
-        transparent: true,
-        opacity: 0.45,
-      })
-    );
-    buildPlateGroup.add(cageLine);
-
-    // X-Symmetry center line on build plate (worldX = 0)
-    const symPoints = [
-      new THREE.Vector3(0, -0.498, -0.52),
-      new THREE.Vector3(0, -0.498, 0.52),
-    ];
-    const symGeo = new THREE.BufferGeometry().setFromPoints(symPoints);
-    const symmetryLine = new THREE.Line(
-      symGeo,
-      new THREE.LineBasicMaterial({ color: 0x38f2ff })
-    );
-    symmetryLine.visible = latestPropsRef.current.mirrorX;
-    buildPlateGroup.add(symmetryLine);
-
-    // Horizontal Y-Layer Slice Guide Frame
-    const slicePts = [
-      new THREE.Vector3(-0.505, 0, -0.505),
-      new THREE.Vector3(0.505, 0, -0.505),
-      new THREE.Vector3(0.505, 0, 0.505),
-      new THREE.Vector3(-0.505, 0, 0.505),
-    ];
-    const sliceGeo = new THREE.BufferGeometry().setFromPoints(slicePts);
-    const sliceGuideMesh = new THREE.LineLoop(
-      sliceGeo,
-      new THREE.LineBasicMaterial({ color: 0xffd43b })
-    );
-    sliceGuideMesh.visible = false;
-    buildPlateGroup.add(sliceGuideMesh);
-
+    // 16x16 Build Plate scaffold (plate, grid, cage, symmetry line, slice guide)
+    const scaffold = buildVoxelSceneScaffold(latestPropsRef.current.mirrorX);
+    const buildPlateGroup = scaffold.group;
+    const plateCollider = scaffold.plateCollider;
+    const symmetryLine = scaffold.symmetryLine;
+    const sliceGuideMesh = scaffold.sliceGuideMesh;
     scene.add(buildPlateGroup);
 
     // Sculpted Voxel Mesh inside Pivot
@@ -240,18 +171,11 @@ export const VoxelSculptorPane: React.FC<VoxelSculptorPaneProps> = ({
     scene.add(voxelPivot);
 
     // Hover Ghost Wireframe Preview Cubes (primary + symmetric)
-    const ghostGroup = new THREE.Group();
-    const step = 1 / VOXEL_GRID_SIZE;
-    const unitCubeEdges = new THREE.EdgesGeometry(
-      new THREE.BoxGeometry(step * 1.03, step * 1.03, step * 1.03)
-    );
-    const ghostMatPrimary = new THREE.LineBasicMaterial({ color: 0xffffff });
-    const ghostMatMirror = new THREE.LineBasicMaterial({ color: 0x38f2ff });
-    const ghostPrimary = new THREE.LineSegments(unitCubeEdges, ghostMatPrimary);
-    const ghostMirror = new THREE.LineSegments(unitCubeEdges, ghostMatMirror);
-    ghostPrimary.visible = false;
-    ghostMirror.visible = false;
-    ghostGroup.add(ghostPrimary, ghostMirror);
+    const ghost = buildGhostPreview();
+    const ghostGroup = ghost.group;
+    const ghostPrimary = ghost.primary;
+    const ghostMirror = ghost.mirror;
+    const ghostMatPrimary = ghost.primaryMat;
     scene.add(ghostGroup);
 
     // Blocky Steve/Alex Arm Container for Held-in-Hand preview
@@ -333,16 +257,7 @@ export const VoxelSculptorPane: React.FC<VoxelSculptorPaneProps> = ({
       return { voxelHit: null, placeCoord: null };
     };
 
-    const setGhostPosition = (
-      mesh: THREE.Object3D,
-      coord: { x: number; y: number; z: number }
-    ) => {
-      mesh.position.set(
-        (coord.x + 0.5) * step - 0.5,
-        (coord.y + 0.5) * step - 0.5,
-        (coord.z + 0.5) * step - 0.5
-      );
-    };
+    const setGhostPosition = ghost.setPosition;
 
     let downPos: { x: number; y: number; button: number } | null = null;
     let movedFar = false;
@@ -579,16 +494,8 @@ export const VoxelSculptorPane: React.FC<VoxelSculptorPaneProps> = ({
       }
       voxelMesh.geometry.dispose();
       voxelMat.dispose();
-      plateGeo.dispose();
-      plateMat.dispose();
-      plateTex.dispose();
-      cageGeo.dispose();
-      cageEdges.dispose();
-      symGeo.dispose();
-      sliceGeo.dispose();
-      unitCubeEdges.dispose();
-      ghostMatPrimary.dispose();
-      ghostMatMirror.dispose();
+      scaffold.dispose();
+      ghost.dispose();
       renderer.dispose();
       if (domCanvas.parentNode === container) {
         container.removeChild(domCanvas);

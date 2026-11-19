@@ -4,11 +4,13 @@ import React from 'react';
 import {
   hasPower,
   ON_HIT_POWERS,
+  ON_RIGHT_CLICK_POWERS,
   PASSIVE_HELD_POWERS,
   type SpecialPowerOption,
 } from '../data/powersCatalog';
 import type { Translations } from '../i18n/translations';
 import type {
+  ArmorSlot,
   AttackSpeedTier,
   EatStatusEffect,
   ItemCategory,
@@ -34,6 +36,7 @@ interface StatsPowersPanelProps {
   onChangeName: (name: string) => void;
   onChangeRarity: (rarity: ItemRarity) => void;
   onChangeCategory: (category: ItemCategory) => void;
+  onChangeArmorSlot: (slot: ArmorSlot) => void;
   onUpdateStats: (patch: Partial<ItemStats>) => void;
   onTogglePower: (option: SpecialPowerOption) => void;
   onOpenMcaddonExport: () => void;
@@ -59,6 +62,17 @@ const CATEGORY_OPTIONS: ReadonlyArray<{
   { id: 'artifact', icon: '🔮' },
 ];
 
+const ARMOR_SLOT_OPTIONS: ReadonlyArray<{
+  id: ArmorSlot;
+  icon: string;
+}> = [
+  { id: 'helmet', icon: '🪖' },
+  { id: 'chestplate', icon: '🛡️' },
+  { id: 'leggings', icon: '🩳' },
+  { id: 'boots', icon: '🥾' },
+  { id: 'shield', icon: '🛡️' },
+];
+
 const SPEED_TIERS: readonly AttackSpeedTier[] = [
   'slow',
   'normal',
@@ -82,6 +96,7 @@ export const StatsPowersPanel: React.FC<StatsPowersPanelProps> = ({
   onChangeName,
   onChangeRarity,
   onChangeCategory,
+  onChangeArmorSlot,
   onUpdateStats,
   onTogglePower,
   onOpenMcaddonExport,
@@ -192,6 +207,31 @@ export const StatsPowersPanel: React.FC<StatsPowersPanelProps> = ({
               })}
             </div>
           </div>
+
+          {/* Armor Slot Selector (only when armor category is active via full category) */}
+          {project.category === 'armor' && (
+            <div className="stats-field-block" data-testid="armor-slot-section">
+              <span className="sub-label">{t.statsPanel.armorSlotLabel}</span>
+              <div className="armor-slot-grid">
+                {ARMOR_SLOT_OPTIONS.map((slot) => {
+                  const isSelected = project.armorSlot === slot.id;
+                  return (
+                    <button
+                      key={slot.id}
+                      type="button"
+                      className={`armor-slot-chip ${isSelected ? 'active' : ''}`}
+                      onClick={() => onChangeArmorSlot(slot.id)}
+                      aria-pressed={isSelected}
+                      data-testid={`armor-slot-${slot.id}`}
+                    >
+                      <span aria-hidden="true">{slot.icon}</span>
+                      <span>{t.armorSlots[slot.id]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
         </section>
 
         {/* 2. Food / Consumable Dedicated Section (shown when Food/Consumable selected) */}
@@ -440,6 +480,38 @@ export const StatsPowersPanel: React.FC<StatsPowersPanelProps> = ({
             </span>
             <div className="powers-badges-wrap">
               {PASSIVE_HELD_POWERS.map((opt) => {
+                const active = hasPower(powers, opt.trigger, opt.effect);
+                return (
+                  <button
+                    key={opt.effect}
+                    type="button"
+                    className={`power-badge-btn ${active ? 'active' : ''}`}
+                    style={
+                      active
+                        ? {
+                            borderColor: opt.badgeColor,
+                            backgroundColor: `${opt.badgeColor}2B`,
+                          }
+                        : undefined
+                    }
+                    onClick={() => onTogglePower(opt)}
+                    aria-pressed={active}
+                    data-testid={`power-${opt.effect}`}
+                  >
+                    <span aria-hidden="true">{opt.iconSymbol}</span>
+                    <span>{opt.label[lang]}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="powers-group">
+            <span className="powers-group-title">
+              {t.statsPanel.onRightClickHeading}
+            </span>
+            <div className="powers-badges-wrap">
+              {ON_RIGHT_CLICK_POWERS.map((opt) => {
                 const active = hasPower(powers, opt.trigger, opt.effect);
                 return (
                   <button

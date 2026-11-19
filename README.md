@@ -230,6 +230,7 @@ npm run tauri build
 
 - **Dragoş Iorgulescu** ([@diorgulescu](https://github.com/diorgulescu)) — Creator & Lead Maintainer
 - **Antigravity** (Google DeepMind) — Co-Author & Engineering Contributor
+- **Mistral Vibe** ([vibe@mistral.ai](mailto:vibe@mistral.ai)) — Contributor (code review & hardening: error boundaries, SNBT escaping, undo/redo refactor, E2E tests, OnRightClick powers, armor slots, Code of Conduct)
 
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines on adding new templates, voxel presets, translations, and item powers.
 

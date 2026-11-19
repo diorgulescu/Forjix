@@ -21,6 +21,17 @@ pub enum ItemCategory {
     Artifact,
 }
 
+#[derive(Debug, Clone, Copy, Default, Serialize, Deserialize, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ArmorSlot {
+    Helmet,
+    #[default]
+    Chestplate,
+    Leggings,
+    Boots,
+    Shield,
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ItemRarity {
@@ -150,6 +161,8 @@ pub struct ItemProject {
     pub voxels: Vec<Voxel>,
     pub category: ItemCategory,
     pub rarity: ItemRarity,
+    #[serde(default)]
+    pub armor_slot: ArmorSlot,
     pub stats: ItemStats,
     pub powers: Vec<ItemPower>,
 }
@@ -316,6 +329,7 @@ mod tests {
             ],
             category: ItemCategory::Weapon,
             rarity: ItemRarity::Legendary,
+            armor_slot: crate::models::ArmorSlot::Chestplate,
             stats: ItemStats {
                 attack_damage: 95.0,
                 attack_speed: 0.0,

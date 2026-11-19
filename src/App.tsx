@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import React, { useCallback, useEffect, useState } from 'react';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Header } from './components/Header';
 import { LeftToolbar } from './components/LeftToolbar';
 import { McaddonExportModal } from './components/McaddonExportModal';
@@ -53,6 +54,7 @@ export const App: React.FC = () => {
     setItemName,
     setItemCategory,
     setItemRarity,
+    setArmorSlot,
     updateItemStats,
     toggleSpecialPower,
     replaceProject,
@@ -310,61 +312,70 @@ export const App: React.FC = () => {
 
         {project.mode === 'extruded' ? (
           <div className="center-split-extruded">
-            <PixelCanvasPane
-              t={t}
-              lang={lang}
-              gridSize={project.gridSize}
-              pixels={project.pixels}
-              activeTool={activeTool}
-              activeColor={activeColor}
-              mirror={mirror}
-              isPainting={isPainting}
-              onPaintingStateChange={setIsPainting}
-              onBeginStroke={beginStroke}
-              onUpdatePixelsLive={handleUpdatePixelsWithSound}
-              onEndStroke={endStroke}
-              onCommitPixelsAction={handleCommitPixelsWithSound}
-              onPickColorFromCanvas={handlePickColorFromModel}
-              onSelectTemplate={applyStarterTemplate}
-              onClearCanvas={clearCanvas}
-            />
+            <ErrorBoundary name="2D Canvas">
+              <PixelCanvasPane
+                t={t}
+                lang={lang}
+                gridSize={project.gridSize}
+                pixels={project.pixels}
+                activeTool={activeTool}
+                activeColor={activeColor}
+                mirror={mirror}
+                isPainting={isPainting}
+                onPaintingStateChange={setIsPainting}
+                onBeginStroke={beginStroke}
+                onUpdatePixelsLive={handleUpdatePixelsWithSound}
+                onEndStroke={endStroke}
+                onCommitPixelsAction={handleCommitPixelsWithSound}
+                onPickColorFromCanvas={handlePickColorFromModel}
+                onSelectTemplate={applyStarterTemplate}
+                onClearCanvas={clearCanvas}
+              />
+            </ErrorBoundary>
 
-            <Viewport3DPane
-              t={t}
-              gridSize={project.gridSize}
-              pixels={project.pixels}
-              voxelCount={project.voxels.length}
-              category={project.category}
-              isPainting={isPainting}
-            />
+            <ErrorBoundary name="3D Viewport">
+              <Viewport3DPane
+                t={t}
+                gridSize={project.gridSize}
+                pixels={project.pixels}
+                voxelCount={project.voxels.length}
+                category={project.category}
+                isPainting={isPainting}
+              />
+            </ErrorBoundary>
           </div>
         ) : (
-          <VoxelSculptorPane
-            t={t}
-            lang={lang}
-            voxels={project.voxels}
-            category={project.category}
-            activeTool={activeTool}
-            activeColor={activeColor}
-            mirrorX={mirror.x}
-            onToggleMirrorX={() => handleToggleMirror('x')}
-            onCommitVoxels={handleCommitVoxelsWithSound}
-            onSelectPreset={applyVoxelPreset}
-            onPickColor={handlePickColorFromModel}
-          />
+          <ErrorBoundary name="3D Voxel Forge">
+            <VoxelSculptorPane
+              t={t}
+              lang={lang}
+              voxels={project.voxels}
+              category={project.category}
+              activeTool={activeTool}
+              activeColor={activeColor}
+              mirrorX={mirror.x}
+              onToggleMirrorX={() => handleToggleMirror('x')}
+              onCommitVoxels={handleCommitVoxelsWithSound}
+              onSelectPreset={applyVoxelPreset}
+              onPickColor={handlePickColorFromModel}
+            />
+          </ErrorBoundary>
         )}
 
-        <StatsPowersPanel
-          project={project}
-          lang={lang}
-          t={t}
-          onChangeName={setItemName}
-          onChangeRarity={setItemRarity}
-          onChangeCategory={setItemCategory}
-          onUpdateStats={updateItemStats}
-          onTogglePower={toggleSpecialPower}
-          onOpenMcaddonExport={() => setIsExportModalOpen(true)}
-        />
+        <ErrorBoundary name="Stats & Powers">
+          <StatsPowersPanel
+            project={project}
+            lang={lang}
+            t={t}
+            onChangeName={setItemName}
+            onChangeRarity={setItemRarity}
+            onChangeCategory={setItemCategory}
+            onChangeArmorSlot={setArmorSlot}
+            onUpdateStats={updateItemStats}
+            onTogglePower={toggleSpecialPower}
+            onOpenMcaddonExport={() => setIsExportModalOpen(true)}
+          />
+        </ErrorBoundary>
       </main>
 
       {isExportModalOpen && (

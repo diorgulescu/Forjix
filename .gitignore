@@ -13,3 +13,8 @@ src-tauri/gen/
 *.swp
 .vscode/*
 !.vscode/extensions.json
+
+# Playwright E2E
+test-results/
+playwright-report/
+playwright/.cache/

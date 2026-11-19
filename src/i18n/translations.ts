@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 import type {
+  ArmorSlot,
   ArmStyle,
   AttackSpeedTier,
   EatStatusEffect,
@@ -78,6 +79,7 @@ export interface Translations {
 
   categories: Record<ItemCategory, string>;
   rarities: Record<ItemRarity, string>;
+  armorSlots: Record<ArmorSlot, string>;
   rarityWithColor: {
     common: string;
     rare: string;
@@ -146,6 +148,7 @@ export interface Translations {
     displayNamePlaceholder: string;
     rarityLabel: string;
     categoryLabel: string;
+    armorSlotLabel: string;
 
     combatHeading: string;
     attackDamageLabel: string;
@@ -166,6 +169,7 @@ export interface Translations {
     powersHeading: string;
     onHitHeading: string;
     passiveHeldHeading: string;
+    onRightClickHeading: string;
     activePowersCount: string;
   };
 
@@ -255,6 +259,14 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       rare: 'Rar',
       epic: 'Epic',
       legendary: 'Legendar',
+    },
+
+    armorSlots: {
+      helmet: 'Cască',
+      chestplate: 'Placoardă',
+      leggings: 'Pantaloni',
+      boots: 'Cizme',
+      shield: 'Scut',
     },
 
     rarityWithColor: {
@@ -368,6 +380,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       displayNamePlaceholder: 'Ex: Sabia de Fulger',
       rarityLabel: 'Raritate',
       categoryLabel: 'Categorie',
+      armorSlotLabel: 'Slot Armură',
 
       combatHeading: 'Statistici Luptă & Utilitate',
       attackDamageLabel: 'Putere de Atac',
@@ -400,6 +413,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       powersHeading: 'Puteri Speciale',
       onHitHeading: 'La lovire (On-Hit)',
       passiveHeldHeading: 'Când o ții în mână (Pasiv)',
+      onRightClickHeading: 'La click dreapta (On-Right-Click)',
       activePowersCount: '{n} active',
     },
 
@@ -488,6 +502,14 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       rare: 'Rare',
       epic: 'Epic',
       legendary: 'Legendary',
+    },
+
+    armorSlots: {
+      helmet: 'Helmet',
+      chestplate: 'Chestplate',
+      leggings: 'Leggings',
+      boots: 'Boots',
+      shield: 'Shield',
     },
 
     rarityWithColor: {
@@ -601,6 +623,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       displayNamePlaceholder: 'E.g. Lightning Blade',
       rarityLabel: 'Rarity',
       categoryLabel: 'Category',
+      armorSlotLabel: 'Armor Slot',
 
       combatHeading: 'Combat & Utility Stats',
       attackDamageLabel: 'Attack Damage',
@@ -633,6 +656,7 @@ export const TRANSLATIONS: Record<Language, Translations> = {
       powersHeading: 'Special Powers',
       onHitHeading: 'On-Hit Effects',
       passiveHeldHeading: 'Passive Held Effects',
+      onRightClickHeading: 'On-Right-Click Effects',
       activePowersCount: '{n} active',
     },
 

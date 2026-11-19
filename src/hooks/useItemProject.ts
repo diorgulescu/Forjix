@@ -9,6 +9,7 @@ import {
 } from '../data/templates';
 import { getVoxelPreset } from '../data/voxelPresets';
 import type {
+  ArmorSlot,
   EditorMode,
   GridSize,
   HexColor,
@@ -43,6 +44,7 @@ interface HistorySnapshot {
   voxels: Voxel[];
   category: ItemCategory;
   rarity: ItemRarity;
+  armorSlot: ArmorSlot;
   name: string;
   slug: string;
   stats: ItemStats;
@@ -75,6 +77,7 @@ export function createInitialProject(
     voxels: pixelsToExtrudedVoxels(pixels, gridSize),
     category: def.category,
     rarity: def.rarity,
+    armorSlot: 'chestplate',
     stats: clampItemStats({ ...def.stats }),
     powers: def.powers.map((p) => ({ ...p })),
   };
@@ -88,6 +91,7 @@ function snapshotOf(project: ItemProject): HistorySnapshot {
     voxels: project.voxels.map((v) => ({ ...v })),
     category: project.category,
     rarity: project.rarity,
+    armorSlot: project.armorSlot,
     name: project.name,
     slug: project.slug,
     stats: { ...project.stats },
@@ -99,23 +103,37 @@ export function useItemProject(initialLang: Language = 'ro') {
   const [project, setProject] = useState<ItemProject>(() =>
     createInitialProject('classic_sword', initialLang)
   );
-  const [undoStack, setUndoStack] = useState<HistorySnapshot[]>([]);
-  const [redoStack, setRedoStack] = useState<HistorySnapshot[]>([]);
+  // Undo/redo stacks live in refs to avoid nested setState calls inside
+  // updater functions (React anti-pattern). State mirrors only hold the
+  // counts so the UI can render undo/redo button badges.
+  const undoStackRef = useRef<HistorySnapshot[]>([]);
+  const redoStackRef = useRef<HistorySnapshot[]>([]);
+  const [undoSteps, setUndoSteps] = useState(0);
+  const [redoSteps, setRedoSteps] = useState(0);
 
   const strokeStartRef = useRef<HistorySnapshot | null>(null);
   const sculptedCacheRef = useRef<Voxel[] | null>(null);
   const latestProjectRef = useRef<ItemProject>(project);
   latestProjectRef.current = project;
 
-  const pushUndoSnapshot = useCallback((snap: HistorySnapshot) => {
-    setUndoStack((prev) => {
-      const next = [...prev, snap];
-      return next.length > MAX_UNDO_STEPS
-        ? next.slice(next.length - MAX_UNDO_STEPS)
-        : next;
-    });
-    setRedoStack([]);
+  const syncHistoryCounts = useCallback(() => {
+    setUndoSteps(undoStackRef.current.length);
+    setRedoSteps(redoStackRef.current.length);
   }, []);
+
+  const pushUndoSnapshot = useCallback(
+    (snap: HistorySnapshot) => {
+      undoStackRef.current = [...undoStackRef.current, snap];
+      if (undoStackRef.current.length > MAX_UNDO_STEPS) {
+        undoStackRef.current = undoStackRef.current.slice(
+          undoStackRef.current.length - MAX_UNDO_STEPS
+        );
+      }
+      redoStackRef.current = [];
+      syncHistoryCounts();
+    },
+    [syncHistoryCounts]
+  );
 
   const setEditorMode = useCallback(
     (nextMode: EditorMode) => {
@@ -230,6 +248,7 @@ export function useItemProject(initialLang: Language = 'ro') {
         slug: slugifyItemName(nextName),
         category: def.category,
         rarity: def.rarity,
+        armorSlot: 'chestplate',
         stats: clampItemStats({ ...def.stats }),
         powers: def.powers.map((p) => ({ ...p })),
         voxels: nextVoxels,
@@ -273,6 +292,7 @@ export function useItemProject(initialLang: Language = 'ro') {
         slug: slugifyItemName(nextName),
         category: def.category,
         rarity: def.rarity,
+        armorSlot: 'chestplate',
         stats: clampItemStats({ ...def.stats }),
         powers: def.powers.map((p) => ({ ...p })),
         pixels: nextPixels,
@@ -315,6 +335,7 @@ export function useItemProject(initialLang: Language = 'ro') {
       voxels: target.voxels.map((v) => ({ ...v })),
       category: target.category,
       rarity: target.rarity,
+      armorSlot: target.armorSlot,
       name: target.name,
       slug: target.slug,
       stats: { ...target.stats },
@@ -323,40 +344,38 @@ export function useItemProject(initialLang: Language = 'ro') {
   };
 
   const undo = useCallback(() => {
-    setUndoStack((prevUndo) => {
-      if (prevUndo.length === 0) return prevUndo;
-      const target = prevUndo[prevUndo.length - 1]!;
-      const currentSnap = snapshotOf(latestProjectRef.current);
+    if (undoStackRef.current.length === 0) return;
+    const target = undoStackRef.current[undoStackRef.current.length - 1]!;
+    const currentSnap = snapshotOf(latestProjectRef.current);
 
-      setRedoStack((prevRedo) => {
-        const next = [...prevRedo, currentSnap];
-        return next.length > MAX_UNDO_STEPS
-          ? next.slice(next.length - MAX_UNDO_STEPS)
-          : next;
-      });
+    undoStackRef.current = undoStackRef.current.slice(0, -1);
+    redoStackRef.current = [...redoStackRef.current, currentSnap];
+    if (redoStackRef.current.length > MAX_UNDO_STEPS) {
+      redoStackRef.current = redoStackRef.current.slice(
+        redoStackRef.current.length - MAX_UNDO_STEPS
+      );
+    }
+    syncHistoryCounts();
 
-      restoreSnapshot(target);
-      return prevUndo.slice(0, -1);
-    });
-  }, []);
+    restoreSnapshot(target);
+  }, [syncHistoryCounts]);
 
   const redo = useCallback(() => {
-    setRedoStack((prevRedo) => {
-      if (prevRedo.length === 0) return prevRedo;
-      const target = prevRedo[prevRedo.length - 1]!;
-      const currentSnap = snapshotOf(latestProjectRef.current);
+    if (redoStackRef.current.length === 0) return;
+    const target = redoStackRef.current[redoStackRef.current.length - 1]!;
+    const currentSnap = snapshotOf(latestProjectRef.current);
 
-      setUndoStack((prevUndo) => {
-        const next = [...prevUndo, currentSnap];
-        return next.length > MAX_UNDO_STEPS
-          ? next.slice(next.length - MAX_UNDO_STEPS)
-          : next;
-      });
+    redoStackRef.current = redoStackRef.current.slice(0, -1);
+    undoStackRef.current = [...undoStackRef.current, currentSnap];
+    if (undoStackRef.current.length > MAX_UNDO_STEPS) {
+      undoStackRef.current = undoStackRef.current.slice(
+        undoStackRef.current.length - MAX_UNDO_STEPS
+      );
+    }
+    syncHistoryCounts();
 
-      restoreSnapshot(target);
-      return prevRedo.slice(0, -1);
-    });
-  }, []);
+    restoreSnapshot(target);
+  }, [syncHistoryCounts]);
 
   const setItemName = useCallback((name: string) => {
     setProject((prev) => ({
@@ -372,6 +391,10 @@ export function useItemProject(initialLang: Language = 'ro') {
 
   const setItemRarity = useCallback((rarity: ItemRarity) => {
     setProject((prev) => ({ ...prev, rarity }));
+  }, []);
+
+  const setArmorSlot = useCallback((armorSlot: ArmorSlot) => {
+    setProject((prev) => ({ ...prev, armorSlot }));
   }, []);
 
   const updateItemStats = useCallback((patch: Partial<ItemStats>) => {
@@ -404,10 +427,10 @@ export function useItemProject(initialLang: Language = 'ro') {
 
   return {
     project,
-    undoSteps: undoStack.length,
-    redoSteps: redoStack.length,
-    canUndo: undoStack.length > 0,
-    canRedo: redoStack.length > 0,
+    undoSteps,
+    redoSteps,
+    canUndo: undoSteps > 0,
+    canRedo: redoSteps > 0,
     setEditorMode,
     beginStroke,
     updatePixelsLive,
@@ -423,6 +446,7 @@ export function useItemProject(initialLang: Language = 'ro') {
     setItemName,
     setItemCategory,
     setItemRarity,
+    setArmorSlot,
     updateItemStats,
     toggleSpecialPower,
     replaceProject,

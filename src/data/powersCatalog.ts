@@ -5,6 +5,7 @@ import type {
   ItemPower,
   Language,
   OnHitEffectId,
+  OnRightClickEffectId,
   PassiveHeldEffectId,
   PowerTrigger,
   SpecialPowerEffectId,
@@ -160,9 +161,51 @@ export const PASSIVE_HELD_POWERS: readonly SpecialPowerOption[] = [
   SpecialPowerOption & { effect: PassiveHeldEffectId }
 >;
 
+export const ON_RIGHT_CLICK_POWERS: readonly SpecialPowerOption[] = [
+  {
+    effect: 'launch_fireball',
+    trigger: 'on_right_click',
+    badgeColor: '#FF6B1A',
+    iconSymbol: '🎆',
+    defaultAmplifier: 1,
+    defaultDurationSeconds: 1,
+    label: {
+      ro: 'Aruncă Bilă de Foc',
+      en: 'Launch Fireball',
+    },
+  },
+  {
+    effect: 'teleport_forward',
+    trigger: 'on_right_click',
+    badgeColor: '#DA77FF',
+    iconSymbol: '🌀',
+    defaultAmplifier: 1,
+    defaultDurationSeconds: 1,
+    label: {
+      ro: 'Teleportare Înainte',
+      en: 'Teleport Forward',
+    },
+  },
+  {
+    effect: 'heal_aura',
+    trigger: 'on_right_click',
+    badgeColor: '#38F27B',
+    iconSymbol: '💚',
+    defaultAmplifier: 1,
+    defaultDurationSeconds: 3,
+    label: {
+      ro: 'Aură de Vindecare',
+      en: 'Heal Aura',
+    },
+  },
+] as const satisfies ReadonlyArray<
+  SpecialPowerOption & { effect: OnRightClickEffectId }
+>;
+
 export const ALL_SPECIAL_POWERS: readonly SpecialPowerOption[] = [
   ...ON_HIT_POWERS,
   ...PASSIVE_HELD_POWERS,
+  ...ON_RIGHT_CLICK_POWERS,
 ];
 
 export function hasPower(

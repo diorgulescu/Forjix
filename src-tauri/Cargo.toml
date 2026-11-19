@@ -4,7 +4,8 @@ version = "0.1.0"
 description = "Forjix — Offline 2D-to-3D Item Forging Desktop Studio"
 authors = [
     "Dragoş Iorgulescu <32508790+diorgulescu@users.noreply.github.com>",
-    "Antigravity (Google DeepMind) <antigravity@google.com>"
+    "Antigravity (Google DeepMind) <antigravity@google.com>",
+    "Mistral Vibe <vibe@mistral.ai>"
 ]
 license = "GPL-3.0-or-later"
 edition = "2021"

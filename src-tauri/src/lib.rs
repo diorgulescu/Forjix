@@ -221,6 +221,7 @@ mod tests {
             ],
             category: ItemCategory::Weapon,
             rarity: ItemRarity::Legendary,
+            armor_slot: crate::models::ArmorSlot::Chestplate,
             stats: ItemStats {
                 attack_damage: 24.0,
                 attack_speed: 2.4,

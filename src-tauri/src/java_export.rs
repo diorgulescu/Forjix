@@ -4,7 +4,7 @@ use crate::mcaddon::{
     build_item_rgba_image, greedy_mesh_voxels_16, render_pack_icon_png, MergedCuboid,
 };
 use crate::models::{
-    EatStatusEffect, EditorMode, ItemCategory, ItemProject, ItemRarity, PowerTrigger,
+    ArmorSlot, EatStatusEffect, EditorMode, ItemCategory, ItemProject, ItemRarity, PowerTrigger,
 };
 use image::codecs::png::PngEncoder;
 use image::{ExtendedColorType, ImageEncoder, Rgba, RgbaImage};
@@ -49,12 +49,18 @@ fn java_rarity_color_name(rarity: ItemRarity) -> &'static str {
     }
 }
 
-fn java_base_item_id(category: ItemCategory) -> &'static str {
+fn java_base_item_id(category: ItemCategory, armor_slot: ArmorSlot) -> &'static str {
     match category {
         ItemCategory::Weapon => "minecraft:diamond_sword",
         ItemCategory::Tool => "minecraft:diamond_pickaxe",
         ItemCategory::Consumable => "minecraft:golden_apple",
-        ItemCategory::Armor => "minecraft:shield",
+        ItemCategory::Armor => match armor_slot {
+            ArmorSlot::Helmet => "minecraft:iron_helmet",
+            ArmorSlot::Chestplate => "minecraft:iron_chestplate",
+            ArmorSlot::Leggings => "minecraft:iron_leggings",
+            ArmorSlot::Boots => "minecraft:iron_boots",
+            ArmorSlot::Shield => "minecraft:shield",
+        },
         ItemCategory::Wand | ItemCategory::Artifact => "minecraft:blaze_rod",
     }
 }
@@ -238,7 +244,7 @@ pub fn build_java_2d_model_json(project: &ItemProject) -> Value {
 /// Constructs the exact Minecraft Java 1.21+ `/give @p <item>[components...] 1` command.
 pub fn build_java_121_give_command(project: &ItemProject) -> String {
     let slug = &project.slug;
-    let base_item = java_base_item_id(project.category);
+    let base_item = java_base_item_id(project.category, project.armor_slot);
     let is_food = project.category == ItemCategory::Consumable;
 
     let display_name = if project.name.trim().is_empty() {
@@ -253,8 +259,8 @@ pub fn build_java_121_give_command(project: &ItemProject) -> String {
         "italic": false
     })
     .to_string();
-    // Escape single quotes inside single-quoted SNBT string
-    let escaped_custom_name = custom_name_json.replace('\'', "\\'");
+    // Escape backslashes first, then single quotes, inside single-quoted SNBT string
+    let escaped_custom_name = custom_name_json.replace('\\', "\\\\").replace('\'', "\\'");
 
     let mut comps: Vec<String> = Vec::new();
     comps.push(format!("minecraft:item_model=\"forjix:{slug}\""));
@@ -409,6 +415,66 @@ fn build_on_hit_mcfunction(project: &ItemProject) -> String {
     if has_on_hit("lifesteal") {
         lines.push("effect give @s minecraft:instant_health 1 0 true".to_string());
         lines.push("particle minecraft:heart ~ ~1.5 ~ 0.3 0.3 0.3 0.02 5".to_string());
+    }
+
+    lines.join("\n") + "\n"
+}
+
+fn build_on_right_click_advancement_json(slug: &str) -> Value {
+    json!({
+        "criteria": {
+            "used_forged_item": {
+                "trigger": "minecraft:using_item",
+                "conditions": {
+                    "item": {
+                        "predicates": {
+                            "minecraft:custom_data": {
+                                "forjix_item": slug
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "rewards": {
+            "function": format!("forjix:on_right_click_{slug}")
+        }
+    })
+}
+
+fn build_on_right_click_mcfunction(project: &ItemProject) -> String {
+    let slug = &project.slug;
+    let has_rc = |eff: &str| {
+        project
+            .powers
+            .iter()
+            .any(|p| p.trigger == PowerTrigger::OnRightClick && p.effect == eff)
+    };
+
+    let mut lines: Vec<String> = vec![
+        format!("# Auto-generated On-Right-Click handler for forjix:{slug}"),
+        format!("advancement revoke @s only forjix:on_right_click_{slug}"),
+    ];
+
+    if has_rc("launch_fireball") {
+        lines.push(
+            "execute at @s anchored eyes run summon minecraft:small_fireball ^ ^ ^1.2 {Fire:20s}"
+                .to_string(),
+        );
+        lines.push(
+            "execute at @s run particle minecraft:flame ~ ~1.5 ~ 0.3 0.3 0.3 0.05 12".to_string(),
+        );
+    }
+    if has_rc("teleport_forward") {
+        lines.push("execute at @s anchored eyes run tp @s ^ ^ ^8".to_string());
+        lines.push(
+            "execute at @s run particle minecraft:portal ~ ~1 ~ 0.5 0.5 0.5 0.1 20".to_string(),
+        );
+    }
+    if has_rc("heal_aura") {
+        lines.push("effect give @s minecraft:instant_health 1 1 true".to_string());
+        lines.push("effect give @e[distance=0.1..6] minecraft:instant_health 1 0 true".to_string());
+        lines.push("particle minecraft:heart ~ ~1.5 ~ 0.4 0.4 0.4 0.02 10".to_string());
     }
 
     lines.join("\n") + "\n"
@@ -618,6 +684,25 @@ pub fn build_java_edition_packs(
             )?;
         }
 
+        let any_right_click = project
+            .powers
+            .iter()
+            .any(|p| p.trigger == PowerTrigger::OnRightClick);
+        if any_right_click {
+            let adv_json = build_on_right_click_advancement_json(&slug);
+            let rc_fn = build_on_right_click_mcfunction(&project);
+            write_zip_json(
+                &mut dp_zip,
+                &format!("data/forjix/advancement/on_right_click_{slug}.json"),
+                &adv_json,
+            )?;
+            write_zip_entry(
+                &mut dp_zip,
+                &format!("data/forjix/function/on_right_click_{slug}.mcfunction"),
+                rc_fn.as_bytes(),
+            )?;
+        }
+
         let any_passive = project
             .powers
             .iter()
@@ -687,6 +772,7 @@ mod tests {
             ],
             category: ItemCategory::Weapon,
             rarity: ItemRarity::Legendary,
+            armor_slot: crate::models::ArmorSlot::Chestplate,
             stats: ItemStats {
                 attack_damage: 25.0,
                 attack_speed: 4.0,
@@ -779,5 +865,53 @@ mod tests {
         assert_eq!(dp_mcmeta["pack"]["pack_format"], json!(48));
 
         let _ = std::fs::remove_dir_all(&temp_dir);
+    }
+
+    #[test]
+    fn give_command_escapes_backslashes_and_single_quotes_in_custom_name() {
+        let mut project = ItemProject {
+            id: "escape-test".to_string(),
+            name: "C:\\path's Sabia".to_string(),
+            slug: String::new(),
+            mode: EditorMode::Extruded,
+            grid_size: 16,
+            pixels: vec![None; 256],
+            voxels: vec![],
+            category: ItemCategory::Weapon,
+            rarity: ItemRarity::Common,
+            armor_slot: crate::models::ArmorSlot::Chestplate,
+            stats: ItemStats {
+                attack_damage: 5.0,
+                attack_speed: 1.6,
+                attack_speed_tier: AttackSpeedTier::Normal,
+                durability: 100,
+                unbreakable: false,
+                movement_speed: 0,
+                mining_speed: 1.0,
+                defense: 0.0,
+                enchantability: 15,
+                hunger_restored: 4,
+                eat_status_effect: EatStatusEffect::None,
+            },
+            powers: vec![],
+        };
+        project.validate_and_normalize().unwrap();
+
+        let cmd = build_java_121_give_command(&project);
+        // The raw unescaped "path's" must NOT appear (quote must be escaped)
+        assert!(
+            !cmd.contains("path's"),
+            "Raw unescaped quote found in: {cmd}"
+        );
+        // The escaped form \' must appear
+        assert!(
+            cmd.contains("\\'s"),
+            "Expected escaped single quote in: {cmd}"
+        );
+        // Backslash must be doubled: original \ becomes \\ in SNBT
+        assert!(
+            cmd.contains("\\\\path"),
+            "Expected doubled backslash before 'path' in: {cmd}"
+        );
     }
 }
