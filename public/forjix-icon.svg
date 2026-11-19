@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none">
+  <!-- Rounded Obsidian Forge Badge -->
+  <rect x="2" y="2" width="60" height="60" rx="14" fill="#14192B" stroke="#FFD43B" stroke-width="3"/>
+  <rect x="6" y="6" width="52" height="52" rx="10" fill="#1B233D"/>
+
+  <!-- Glowing Forge Aura -->
+  <circle cx="32" cy="34" r="18" fill="#FF7B1C" fill-opacity="0.16"/>
+
+  <!-- Pixel Forge Sparks -->
+  <rect x="14" y="14" width="4" height="4" fill="#FFE054"/>
+  <rect x="47" y="12" width="4" height="4" fill="#38F2FF"/>
+  <rect x="49" y="23" width="3" height="3" fill="#FF6B1A"/>
+  <rect x="11" y="25" width="3" height="3" fill="#5CEEFF"/>
+
+  <!-- Diagonal Wooden Hammer Handle -->
+  <path d="M16 28L28 16L32 20L20 32L16 28Z" fill="#9A6230" stroke="#101422" stroke-width="2" stroke-linejoin="round"/>
+  <!-- Golden & Cyan Voxel Hammer Head -->
+  <path d="M25 11L33 9L41 17L39 25L31 27L23 19L25 11Z" fill="#FFD43B" stroke="#101422" stroke-width="2.2" stroke-linejoin="round"/>
+  <path d="M29 14L35 13L38 19L32 21L29 14Z" fill="#FFF7B2"/>
+  <rect x="31" y="16" width="4" height="4" fill="#38F2FF"/>
+
+  <!-- Glowing Pixel-Art Steel & Lava Anvil -->
+  <!-- Anvil Top Face -->
+  <path d="M10 36H52V42H44L41 46H23L20 42H14L10 38V36Z" fill="#D5E3F7" stroke="#101422" stroke-width="2.2" stroke-linejoin="round"/>
+  <!-- Molten Rune Core -->
+  <rect x="25" y="38" width="14" height="3" rx="1" fill="#FF6B1A"/>
+  <rect x="28" y="38" width="8" height="2" fill="#FFE054"/>
+  <!-- Anvil Waist & Heavy Base -->
+  <path d="M23 46H41L43 50H48V55H16V50H21L23 46Z" fill="#8B9BB4" stroke="#101422" stroke-width="2.2" stroke-linejoin="round"/>
+  <rect x="18" y="51" width="28" height="2" fill="#C7D5E8"/>
+</svg>

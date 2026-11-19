@@ -1,0 +1,74 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
+name: Release Desktop Installers
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish-tauri:
+    name: Build Forjix (${{ matrix.label }})
+    runs-on: ${{ matrix.platform }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: '--target universal-apple-darwin'
+            label: macOS Universal
+          - platform: ubuntu-22.04
+            args: ''
+            label: Linux x64
+          - platform: windows-latest
+            args: ''
+            label: Windows x64
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Linux Tauri system dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev \
+            libappindicator3-dev \
+            librsvg2-dev \
+            patchelf
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Setup Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Cache Cargo build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Build and bundle Tauri desktop application
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: v__VERSION__
+          releaseName: 'Forjix v__VERSION__'
+          releaseBody: 'Cross-platform offline installers for **Forjix**. Download the installer for your operating system (`.dmg` for macOS, `.msi` / `-setup.exe` for Windows, `.AppImage` / `.deb` / `.rpm` for Linux).'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
