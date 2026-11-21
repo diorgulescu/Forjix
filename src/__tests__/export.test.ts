@@ -178,4 +178,13 @@ describe('Export & Project Serialization', () => {
     const cmd = buildJava121GiveCommandClient(wandWithRightClick);
     expect(cmd).toContain('eat_seconds:3600.0');
   });
+
+  it('includes food status effects in client Java 1.21+ give command matching Rust export', () => {
+    const foodProj = createInitialProject('golden_apple', 'ro');
+    const cmd = buildJava121GiveCommandClient(foodProj);
+    expect(cmd.startsWith('/give @p minecraft:golden_apple[')).toBe(true);
+    expect(cmd).toContain(
+      'effects:[{effect:{id:"minecraft:regeneration",amplifier:1,duration:200},probability:1.0f}]'
+    );
+  });
 });

@@ -13,9 +13,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit && vite build",
     "preview": "vite preview",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.node.json --noEmit",
     "test": "vitest run",
     "test:e2e": "playwright test",
     "tauri": "tauri"
@@ -30,10 +30,11 @@
   "devDependencies": {
     "@playwright/test": "^1.65.1",
     "@tauri-apps/cli": "^2.1.0",
+    "@types/node": "^26.6.6",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",
     "@types/three": "^0.170.0",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.3.0",
     "typescript": "^5.6.3",
     "vite": "^8.3.8",
     "vitest": "^5.1.1"

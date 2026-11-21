@@ -160,9 +160,26 @@ export function buildJava121GiveCommandClient(project: ItemProject): string {
   } else {
     const nutrition = normalized.stats.hungerRestored * 2;
     const saturation = (nutrition * 0.6).toFixed(1);
-    comps.push(
-      `minecraft:food={nutrition:${nutrition},saturation:${saturation},can_always_eat:true}`
-    );
+    if (normalized.stats.eatStatusEffect !== 'none') {
+      const eatEffectMap: Record<
+        Exclude<typeof normalized.stats.eatStatusEffect, 'none'>,
+        { id: string; ticks: number; amp: number }
+      > = {
+        regeneration: { id: 'minecraft:regeneration', ticks: 200, amp: 1 },
+        absorption: { id: 'minecraft:absorption', ticks: 1200, amp: 1 },
+        speed: { id: 'minecraft:speed', ticks: 300, amp: 1 },
+        fire_resistance: { id: 'minecraft:fire_resistance', ticks: 600, amp: 0 },
+        night_vision: { id: 'minecraft:night_vision', ticks: 600, amp: 0 },
+      };
+      const eff = eatEffectMap[normalized.stats.eatStatusEffect];
+      comps.push(
+        `minecraft:food={nutrition:${nutrition},saturation:${saturation},can_always_eat:true,effects:[{effect:{id:"${eff.id}",amplifier:${eff.amp},duration:${eff.ticks}},probability:1.0f}]}`
+      );
+    } else {
+      comps.push(
+        `minecraft:food={nutrition:${nutrition},saturation:${saturation},can_always_eat:true}`
+      );
+    }
   }
 
   const hasFireRes = normalized.powers.some(

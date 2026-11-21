@@ -16,7 +16,7 @@
 
 ---
 
-**Forjix** is a cross-platform, 100% offline desktop application built with **Tauri v2**, **Rust**, **React/TypeScript**, and **Three.js** that empowers children ages **6–12** (alongside parents and educators) to design, sculpt, configure, and export custom **Minecraft** weapons, tools, food, and magical artifacts—without writing a single line of code or JSON.
+**Forjix** is a cross-platform, 100% offline desktop application built with **Tauri v2**, **Rust**, **React/TypeScript**, and **Three.js** that empowers children ages **6–12** (alongside parents and educators) to design, sculpt, configure, and export custom **Minecraft** weapons, tools, armor, food, and magical artifacts—without writing a single line of code or JSON.
 
 Forged creations export directly to **Minecraft Bedrock Edition**, **Minecraft Education** (`.mcaddon`), and **Minecraft Java Edition 1.21+** (`_java_resourcepack.zip` + `_java_datapack.zip`).
 
@@ -56,25 +56,26 @@ Forged creations export directly to **Minecraft Bedrock Edition**, **Minecraft E
 - **Starter 3D Presets**: *3D War Hammer*, *Royal Crown*, *Champion Trophy*, *Magic Totem*, and *Empty Plate*.
 
 ### Visual Stats & Special Powers Configurator
-- **Identity & Rarity**: Custom Display Name (auto-generating a valid `forjix:<slug>` ID), **Rarity** (*Common/White*, *Rare/Aqua*, *Epic/Light Purple*, *Legendary/Gold*), and **Category** (*Weapon*, *Tool*, *Food/Consumable*, *Magic Artifact*).
+- **Identity, Rarity & Armor Slots**: Custom Display Name (auto-generating a valid `forjix:<slug>` ID), **Rarity** (*Common/White*, *Rare/Aqua*, *Epic/Light Purple*, *Legendary/Gold*), and **Category** (*Weapon*, *Tool*, *Shield/Armor* with *Helmet*, *Chestplate*, *Leggings*, *Boots*, & *Shield* slots, *Food/Consumable*, *Magic Artifact*).
 - **Clamped Combat & Utility Sliders**:
   - **Attack Damage** (`1–50`) with live full/half pixel heart icons (`0.5` to `25` hearts).
   - **Durability** (`50–5000`) or **Unbreakable (`∞`)** toggle.
   - **Attack Speed** (*Slow*, *Normal*, *Fast*, *Lightning*) and **Movement Speed** (`-20%` to `+50%`).
 - **Food / Consumable Controls**: **Hunger Restored** (`1–10` visual drumstick icons) and **Status Effect on Eat** (*Regeneration*, *Golden Hearts/Absorption*, *Super Speed*, *Fire Immunity*, *Night Vision*).
-- **11 Multi-Select Special Powers**:
+- **14 Multi-Select Special Powers**:
   - **On-Hit Effects**: *Set Target on Fire*, *Summon Lightning Bolt*, *Freeze/Slowness*, *Super Knockback*, *Poison*, *Lifesteal (heals player)*.
   - **Passive Held Effects**: *Speed Boost*, *Super Jump*, *Night Vision*, *Fire Resistance*, *Glowing Aura*.
+  - **On-Right-Click Effects**: *Launch Fireball*, *Teleport Forward*, *Heal Aura*.
 
 ### Native Rust Multi-Edition Export Engine & Local `.forjix.json` Library
 - **Save & Reopen Projects**: Native OS file dialogs (`tauri-plugin-dialog`) + Rust `std::fs` persistence (`save_forjix_project`, `load_forjix_project`) for `.forjix.json` item files.
 - **Minecraft Bedrock & Minecraft Education (`.mcaddon`)**:
   - Cross-linked Behavior Pack (`BP/`) & Resource Pack (`RP/`) `manifest.json` files (`min_engine_version: [1, 20, 80]`) with fresh `v4` UUIDs.
   - RGBA item PNGs via the Rust `image` crate, `en_US.lang` / `ro_RO.lang` rarity color prefixes (`§f`, `§b`, `§d`, `§6`), and 3D greedy cuboid meshing (`models/entity/<slug>.geo.json` + bleed-proof UV atlas + `attachables/<slug>.json`).
-  - Clean `@minecraft/server` `scripts/main.js` generation for `entityHitEntity`, `system.runInterval`, and `itemCompleteUse`.
+  - Wearable & enchantable armor slot components, right-click cooldowns, and clean `@minecraft/server` `scripts/main.js` generation for `entityHitEntity`, `itemUse`, `system.runInterval`, and `itemCompleteUse`.
 - **Minecraft Java Edition 1.21+ (`_java_resourcepack.zip` + `_java_datapack.zip`)**:
   - `pack_format: 34` Resource Pack with `assets/forjix/textures/item/<slug>.png`, `assets/forjix/items/<slug>.json`, and 2D `item/handheld` or greedy-meshed 3D element models (`assets/forjix/models/item/<slug>.json`) with `display` transforms.
-  - `pack_format: 48` Data Pack with `give_<slug>.mcfunction` using modern 1.21+ Item Components (`minecraft:item_model`, `minecraft:custom_name`, `minecraft:attribute_modifiers`, `minecraft:max_damage` / `minecraft:unbreakable`, `minecraft:fire_resistant`, `minecraft:food`), `player_hurt_entity` advancements for On-Hit powers, passive tick functions, and a 1-click **Copy `/give` Command** button.
+  - `pack_format: 48` Data Pack with `give_<slug>.mcfunction` using modern 1.21+ Item Components (`minecraft:item_model`, `minecraft:custom_name`, `minecraft:attribute_modifiers`, `minecraft:max_damage` / `minecraft:unbreakable`, `minecraft:fire_resistant`, `minecraft:food`), `player_hurt_entity` & `using_item` advancements for On-Hit and On-Right-Click powers, passive tick functions, and a 1-click **Copy `/give` Command** button.
 
 ---
 
@@ -119,28 +120,31 @@ forjix/
 │   ├── dependabot.yml            # Weekly dependency updates
 │   └── pull_request_template.md
 ├── docs/screenshots/             # Verified application screenshots
+├── e2e/smoke.spec.ts             # Playwright E2E smoke test suite
 ├── public/forjix-icon.svg        # Custom voxel Anvil & Hammer SVG emblem
 ├── src/
-│   ├── __tests__/forjix.test.ts  # Vitest unit & serialization test suite
-│   ├── components/               # React UI, 2D canvas, 3D viewports & export modal
+│   ├── __tests__/                # Modular Vitest unit & export parity suites
+│   ├── components/               # React UI, error boundaries, 2D/3D panes & modal
 │   ├── data/                     # Color palettes, 2D templates, 3D presets & powers
 │   ├── hooks/useItemProject.ts   # Central ItemProject state & 50-step Undo/Redo
 │   ├── i18n/translations.ts      # Complete Romanian (RO) & English (EN) strings
 │   ├── ipc/tauriBridge.ts        # Type-safe Tauri v2 IPC + dev fallbacks
 │   ├── styles/app.css            # High-contrast kid-friendly dark forge theme
-│   ├── three/                    # Extruded mesh, 3D voxel mesh & Steve/Alex arm
+│   ├── three/                    # Extruded mesh, 3D voxel mesh, scaffold & arm
 │   ├── types/project.ts          # Strict ItemProject & editor TypeScript types
 │   └── utils/                    # Bresenham strokes, flood fill, voxel ops & Web Audio
-└── src-tauri/
-    ├── capabilities/default.json # Scoped offline Tauri v2 permissions
-    ├── icons/                    # Multi-platform .icns, .ico & RGBA .png icons
-    ├── src/
-    │   ├── lib.rs                # Tauri commands & .forjix.json persistence
-    │   ├── models.rs             # Serde ItemProject schema & validation
-    │   ├── mcaddon.rs            # Bedrock / Education .mcaddon + 3D greedy mesher
-    │   └── java_export.rs        # Java Edition 1.21+ Resource Pack & Data Pack
-    ├── Cargo.toml
-    └── tauri.conf.json
+├── src-tauri/
+│   ├── capabilities/default.json # Scoped offline Tauri v2 permissions
+│   ├── icons/                    # Multi-platform .icns, .ico & RGBA .png icons
+│   ├── src/
+│   │   ├── lib.rs                # Tauri commands & .forjix.json persistence
+│   │   ├── models.rs             # Serde ItemProject schema & validation
+│   │   ├── mcaddon.rs            # Bedrock / Education .mcaddon + 3D greedy mesher
+│   │   └── java_export.rs        # Java Edition 1.21+ Resource Pack & Data Pack
+│   ├── Cargo.toml
+│   └── tauri.conf.json
+├── playwright.config.ts
+└── vite.config.ts
 ```
 
 ---
@@ -210,10 +214,11 @@ npm run tauri dev
 ### Running Tests & Production Build
 
 ```bash
-# Strict TypeScript check, Vitest unit tests & Vite bundle
+# Strict TypeScript check, Vitest unit tests, Playwright E2E & Vite bundle
 npm run typecheck
 npm test
 npm run build
+npm run test:e2e
 
 # Rust formatting, Clippy lints & unit/export tests
 cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
