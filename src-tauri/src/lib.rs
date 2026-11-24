@@ -154,7 +154,7 @@ async fn load_forjix_project(
 }
 
 /// Exports the forged item into a valid, double-click installable Minecraft Bedrock
-/// & Minecraft Education `.mcaddon` archive containing linked `BP/` and `RP/` folders.
+/// & Minecraft Education `.mcaddon` archive bundling `<slug>_rp.mcpack` and `<slug>_bp.mcpack`.
 #[tauri::command(rename_all = "snake_case")]
 fn export_bedrock_mcaddon(project: ItemProject, output_path: String) -> Result<String, String> {
     let written = build_mcaddon_package(project, &output_path)?;

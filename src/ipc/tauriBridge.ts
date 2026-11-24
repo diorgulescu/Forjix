@@ -436,13 +436,78 @@ export async function exportBedrockMcaddon(
   }
 
   const enc = new TextEncoder();
-  const slug = normalized.slug;
-  const langLine = `item.forjix:${slug}.name=${rarityColorCode(normalized.rarity)}${normalized.name}\n`;
-  const zipBytes = buildStoreZip([
-    { name: 'RP/texts/en_US.lang', data: enc.encode(langLine) },
-    { name: 'RP/texts/ro_RO.lang', data: enc.encode(langLine) },
+  const slug = normalized.slug || 'forjix_item';
+  const displayName = normalized.name.trim() || 'Forjix Item';
+  const makeUuid = () =>
+    typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+      ? crypto.randomUUID()
+      : 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+          const r = (Math.random() * 16) | 0;
+          const v = c === 'x' ? r : (r & 0x3) | 0x8;
+          return v.toString(16);
+        });
+
+  const bpHeaderUuid = makeUuid();
+  const bpModuleUuid = makeUuid();
+  const rpHeaderUuid = makeUuid();
+  const rpModuleUuid = makeUuid();
+
+  const rpManifest = {
+    format_version: 2,
+    header: {
+      name: `Forjix RP — ${displayName}`,
+      description: `Resource Pack for ${displayName} (forjix:${slug})`,
+      uuid: rpHeaderUuid,
+      version: [1, 0, 0],
+      min_engine_version: [1, 20, 80],
+    },
+    modules: [
+      {
+        type: 'resources',
+        description: 'Forjix Item Textures & Geometry',
+        uuid: rpModuleUuid,
+        version: [1, 0, 0],
+      },
+    ],
+    dependencies: [{ uuid: bpHeaderUuid, version: [1, 0, 0] }],
+  };
+
+  const bpManifest = {
+    format_version: 2,
+    header: {
+      name: `Forjix BP — ${displayName}`,
+      description: `Behavior Pack for ${displayName} (forjix:${slug})`,
+      uuid: bpHeaderUuid,
+      version: [1, 0, 0],
+      min_engine_version: [1, 20, 80],
+    },
+    modules: [
+      {
+        type: 'data',
+        description: 'Forjix Item Behavior Data',
+        uuid: bpModuleUuid,
+        version: [1, 0, 0],
+      },
+    ],
+    dependencies: [{ uuid: rpHeaderUuid, version: [1, 0, 0] }],
+  };
+
+  const langLine = `item.forjix:${slug}.name=${rarityColorCode(normalized.rarity)}${displayName}\n`;
+  const rpMcpack = buildStoreZip([
     {
-      name: `BP/items/${slug}.json`,
+      name: 'manifest.json',
+      data: enc.encode(JSON.stringify(rpManifest, null, 2)),
+    },
+    { name: 'texts/en_US.lang', data: enc.encode(langLine) },
+    { name: 'texts/ro_RO.lang', data: enc.encode(langLine) },
+  ]);
+  const bpMcpack = buildStoreZip([
+    {
+      name: 'manifest.json',
+      data: enc.encode(JSON.stringify(bpManifest, null, 2)),
+    },
+    {
+      name: `items/${slug}.json`,
       data: enc.encode(
         JSON.stringify(
           {
@@ -456,6 +521,11 @@ export async function exportBedrockMcaddon(
         )
       ),
     },
+  ]);
+
+  const zipBytes = buildStoreZip([
+    { name: `${slug}_rp.mcpack`, data: rpMcpack },
+    { name: `${slug}_bp.mcpack`, data: bpMcpack },
   ]);
 
   triggerBrowserBlobDownload(zipBytes, defaultFile);

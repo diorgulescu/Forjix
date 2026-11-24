@@ -613,24 +613,24 @@ pub fn build_bp_item_json(project: &ItemProject) -> Value {
     let menu_category = match project.category {
         ItemCategory::Weapon => json!({
             "category": "equipment",
-            "group": "itemGroup.name.sword"
+            "group": "minecraft:itemGroup.name.sword"
         }),
         ItemCategory::Tool => json!({
             "category": "equipment",
-            "group": "itemGroup.name.pickaxe"
+            "group": "minecraft:itemGroup.name.pickaxe"
         }),
         ItemCategory::Consumable => json!({
             "category": "nature",
-            "group": "itemGroup.name.crop"
+            "group": "minecraft:itemGroup.name.crop"
         }),
         ItemCategory::Armor => json!({
             "category": "equipment",
             "group": match project.armor_slot {
-                ArmorSlot::Helmet => "itemGroup.name.helmet",
-                ArmorSlot::Chestplate => "itemGroup.name.chestplate",
-                ArmorSlot::Leggings => "itemGroup.name.leggings",
-                ArmorSlot::Boots => "itemGroup.name.boots",
-                ArmorSlot::Shield => "itemGroup.name.shield",
+                ArmorSlot::Helmet => "minecraft:itemGroup.name.helmet",
+                ArmorSlot::Chestplate => "minecraft:itemGroup.name.chestplate",
+                ArmorSlot::Leggings => "minecraft:itemGroup.name.leggings",
+                ArmorSlot::Boots => "minecraft:itemGroup.name.boots",
+                ArmorSlot::Shield => "minecraft:itemGroup.name.shield",
             }
         }),
         ItemCategory::Wand | ItemCategory::Artifact => json!({
@@ -638,8 +638,16 @@ pub fn build_bp_item_json(project: &ItemProject) -> Value {
         }),
     };
 
+    let icon_key = format!("forjix_{slug}");
     let mut components = Map::new();
-    components.insert("minecraft:icon".to_string(), json!(identifier));
+    components.insert(
+        "minecraft:icon".to_string(),
+        json!({
+            "textures": {
+                "default": icon_key
+            }
+        }),
+    );
     components.insert(
         "minecraft:display_name".to_string(),
         json!({ "value": format!("item.forjix:{slug}.name") }),
@@ -758,6 +766,17 @@ fn ensure_mcaddon_extension(raw_path: &str) -> PathBuf {
     }
 }
 
+fn write_zip_dir<W: Write + std::io::Seek>(
+    zip: &mut ZipWriter<W>,
+    dir_path: &str,
+) -> Result<(), String> {
+    let opts = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Stored)
+        .unix_permissions(0o755);
+    zip.add_directory(dir_path, opts)
+        .map_err(|e| format!("Failed adding zip directory '{dir_path}': {e}"))
+}
+
 fn write_zip_entry<W: Write + std::io::Seek>(
     zip: &mut ZipWriter<W>,
     entry_path: &str,
@@ -765,6 +784,21 @@ fn write_zip_entry<W: Write + std::io::Seek>(
 ) -> Result<(), String> {
     let opts = SimpleFileOptions::default()
         .compression_method(CompressionMethod::Deflated)
+        .unix_permissions(0o644);
+    zip.start_file(entry_path, opts)
+        .map_err(|e| format!("Failed starting zip entry '{entry_path}': {e}"))?;
+    zip.write_all(bytes)
+        .map_err(|e| format!("Failed writing zip entry '{entry_path}': {e}"))?;
+    Ok(())
+}
+
+fn write_stored_zip_entry<W: Write + std::io::Seek>(
+    zip: &mut ZipWriter<W>,
+    entry_path: &str,
+    bytes: &[u8],
+) -> Result<(), String> {
+    let opts = SimpleFileOptions::default()
+        .compression_method(CompressionMethod::Stored)
         .unix_permissions(0o644);
     zip.start_file(entry_path, opts)
         .map_err(|e| format!("Failed starting zip entry '{entry_path}': {e}"))?;
@@ -883,11 +917,12 @@ pub fn build_mcaddon_package(
     let item_png_bytes = encode_png_bytes(&item_rgba)?;
     let pack_icon_bytes = render_pack_icon_png(&item_rgba)?;
 
+    let icon_key = format!("forjix_{slug}");
     let item_texture_json = json!({
         "resource_pack_name": "forjix_rp",
         "texture_name": "atlas.items",
         "texture_data": {
-            format!("forjix:{slug}"): {
+            icon_key: {
                 "textures": format!("textures/items/{slug}")
             }
         }
@@ -898,7 +933,95 @@ pub fn build_mcaddon_package(
     let lang_line = format!("item.forjix:{slug}.name={color_code}{display_name}\n");
     let languages_json = json!(["en_US", "ro_RO"]);
 
-    // 5. Write ZIP (.mcaddon) archive
+    // 5. Build standalone Resource Pack (<slug>_rp.mcpack) with root manifest.json
+    let rp_mcpack_bytes = {
+        let mut rp_zip = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        write_zip_json(&mut rp_zip, "manifest.json", &rp_manifest)?;
+        write_zip_entry(&mut rp_zip, "pack_icon.png", &pack_icon_bytes)?;
+
+        write_zip_dir(&mut rp_zip, "textures/")?;
+        write_zip_dir(&mut rp_zip, "textures/items/")?;
+        write_zip_json(
+            &mut rp_zip,
+            "textures/item_texture.json",
+            &item_texture_json,
+        )?;
+        write_zip_entry(
+            &mut rp_zip,
+            &format!("textures/items/{slug}.png"),
+            &item_png_bytes,
+        )?;
+
+        write_zip_dir(&mut rp_zip, "texts/")?;
+        write_zip_json(&mut rp_zip, "texts/languages.json", &languages_json)?;
+        write_zip_entry(&mut rp_zip, "texts/en_US.lang", lang_line.as_bytes())?;
+        write_zip_entry(&mut rp_zip, "texts/ro_RO.lang", lang_line.as_bytes())?;
+
+        // 3D Voxel mode greedy-meshed geometry + UV atlas + attachable
+        if project.mode == EditorMode::Voxel && !project.voxels.is_empty() {
+            let merged = greedy_mesh_voxels_16(&project.voxels)?;
+            let (atlas_png, geo_json) = build_voxel_uv_atlas_and_geo(&slug, &merged)?;
+            let anim_json = build_attachable_animation_json(&slug);
+            let attachable_json = build_attachable_json(&slug);
+
+            write_zip_dir(&mut rp_zip, "textures/entity/")?;
+            write_zip_dir(&mut rp_zip, "models/")?;
+            write_zip_dir(&mut rp_zip, "models/entity/")?;
+            write_zip_dir(&mut rp_zip, "animations/")?;
+            write_zip_dir(&mut rp_zip, "attachables/")?;
+
+            write_zip_entry(
+                &mut rp_zip,
+                &format!("textures/entity/{slug}_3d.png"),
+                &atlas_png,
+            )?;
+            write_zip_json(
+                &mut rp_zip,
+                &format!("models/entity/{slug}.geo.json"),
+                &geo_json,
+            )?;
+            write_zip_json(
+                &mut rp_zip,
+                &format!("animations/{slug}.attachable.animation.json"),
+                &anim_json,
+            )?;
+            write_zip_json(
+                &mut rp_zip,
+                &format!("attachables/{slug}.json"),
+                &attachable_json,
+            )?;
+        }
+
+        rp_zip
+            .finish()
+            .map_err(|e| format!("Failed finalizing Resource Pack .mcpack: {e}"))?
+            .into_inner()
+    };
+
+    // 6. Build standalone Behavior Pack (<slug>_bp.mcpack) with root manifest.json
+    let bp_mcpack_bytes = {
+        let mut bp_zip = ZipWriter::new(std::io::Cursor::new(Vec::new()));
+        write_zip_json(&mut bp_zip, "manifest.json", &bp_manifest)?;
+        write_zip_entry(&mut bp_zip, "pack_icon.png", &pack_icon_bytes)?;
+
+        write_zip_dir(&mut bp_zip, "items/")?;
+        let bp_item_json = build_bp_item_json(&project);
+        write_zip_json(&mut bp_zip, &format!("items/{slug}.json"), &bp_item_json)?;
+
+        if use_scripts {
+            write_zip_dir(&mut bp_zip, "scripts/")?;
+            let script_js = generate_behavior_script_js(&project);
+            write_zip_entry(&mut bp_zip, "scripts/main.js", script_js.as_bytes())?;
+        }
+
+        bp_zip
+            .finish()
+            .map_err(|e| format!("Failed finalizing Behavior Pack .mcpack: {e}"))?
+            .into_inner()
+    };
+
+    // 7. Bundle <slug>_rp.mcpack and <slug>_bp.mcpack at the root of <slug>.mcaddon
+    //    per Microsoft's official Bedrock & Minecraft Education Add-On specification.
     let out_file = File::create(&final_path).map_err(|e| {
         format!(
             "Could not create .mcaddon file '{}': {e}",
@@ -906,63 +1029,8 @@ pub fn build_mcaddon_package(
         )
     })?;
     let mut zip = ZipWriter::new(out_file);
-
-    // Resource Pack entries
-    write_zip_json(&mut zip, "RP/manifest.json", &rp_manifest)?;
-    write_zip_entry(&mut zip, "RP/pack_icon.png", &pack_icon_bytes)?;
-    write_zip_entry(
-        &mut zip,
-        &format!("RP/textures/items/{slug}.png"),
-        &item_png_bytes,
-    )?;
-    write_zip_json(
-        &mut zip,
-        "RP/textures/item_texture.json",
-        &item_texture_json,
-    )?;
-    write_zip_json(&mut zip, "RP/texts/languages.json", &languages_json)?;
-    write_zip_entry(&mut zip, "RP/texts/en_US.lang", lang_line.as_bytes())?;
-    write_zip_entry(&mut zip, "RP/texts/ro_RO.lang", lang_line.as_bytes())?;
-
-    // 3D Voxel mode greedy-meshed geometry + UV atlas + attachable
-    if project.mode == EditorMode::Voxel && !project.voxels.is_empty() {
-        let merged = greedy_mesh_voxels_16(&project.voxels)?;
-        let (atlas_png, geo_json) = build_voxel_uv_atlas_and_geo(&slug, &merged)?;
-        let anim_json = build_attachable_animation_json(&slug);
-        let attachable_json = build_attachable_json(&slug);
-
-        write_zip_entry(
-            &mut zip,
-            &format!("RP/textures/entity/{slug}_3d.png"),
-            &atlas_png,
-        )?;
-        write_zip_json(
-            &mut zip,
-            &format!("RP/models/entity/{slug}.geo.json"),
-            &geo_json,
-        )?;
-        write_zip_json(
-            &mut zip,
-            &format!("RP/animations/{slug}.attachable.animation.json"),
-            &anim_json,
-        )?;
-        write_zip_json(
-            &mut zip,
-            &format!("RP/attachables/{slug}.json"),
-            &attachable_json,
-        )?;
-    }
-
-    // Behavior Pack entries
-    write_zip_json(&mut zip, "BP/manifest.json", &bp_manifest)?;
-    write_zip_entry(&mut zip, "BP/pack_icon.png", &pack_icon_bytes)?;
-    let bp_item_json = build_bp_item_json(&project);
-    write_zip_json(&mut zip, &format!("BP/items/{slug}.json"), &bp_item_json)?;
-
-    if use_scripts {
-        let script_js = generate_behavior_script_js(&project);
-        write_zip_entry(&mut zip, "BP/scripts/main.js", script_js.as_bytes())?;
-    }
+    write_stored_zip_entry(&mut zip, &format!("{slug}_rp.mcpack"), &rp_mcpack_bytes)?;
+    write_stored_zip_entry(&mut zip, &format!("{slug}_bp.mcpack"), &bp_mcpack_bytes)?;
 
     zip.finish()
         .map_err(|e| format!("Failed finalizing .mcaddon archive: {e}"))?;
@@ -1069,34 +1137,63 @@ mod tests {
         let written_path =
             build_mcaddon_package(project, &temp_out.to_string_lossy()).expect("export .mcaddon");
 
-        let file = File::open(&written_path).expect("open zip");
-        let mut archive = ZipArchive::new(file).expect("valid zip archive");
+        let file = File::open(&written_path).expect("open .mcaddon zip");
+        let mut addon_archive = ZipArchive::new(file).expect("valid .mcaddon archive");
+        assert_eq!(addon_archive.len(), 2);
 
-        let expected_entries = [
-            "RP/manifest.json",
-            "RP/textures/items/sabia_de_fulger.png",
-            "RP/textures/item_texture.json",
-            "RP/texts/en_US.lang",
-            "RP/texts/ro_RO.lang",
-            "RP/models/entity/sabia_de_fulger.geo.json",
-            "RP/textures/entity/sabia_de_fulger_3d.png",
-            "RP/attachables/sabia_de_fulger.json",
-            "BP/manifest.json",
-            "BP/items/sabia_de_fulger.json",
-            "BP/scripts/main.js",
+        let mut rp_bytes = Vec::new();
+        addon_archive
+            .by_name("sabia_de_fulger_rp.mcpack")
+            .expect("missing RP .mcpack at .mcaddon root")
+            .read_to_end(&mut rp_bytes)
+            .unwrap();
+        let mut rp_archive =
+            ZipArchive::new(std::io::Cursor::new(rp_bytes)).expect("valid RP .mcpack");
+
+        let mut bp_bytes = Vec::new();
+        addon_archive
+            .by_name("sabia_de_fulger_bp.mcpack")
+            .expect("missing BP .mcpack at .mcaddon root")
+            .read_to_end(&mut bp_bytes)
+            .unwrap();
+        let mut bp_archive =
+            ZipArchive::new(std::io::Cursor::new(bp_bytes)).expect("valid BP .mcpack");
+
+        let expected_rp_entries = [
+            "manifest.json",
+            "pack_icon.png",
+            "textures/items/sabia_de_fulger.png",
+            "textures/item_texture.json",
+            "texts/en_US.lang",
+            "texts/ro_RO.lang",
+            "models/entity/sabia_de_fulger.geo.json",
+            "textures/entity/sabia_de_fulger_3d.png",
+            "attachables/sabia_de_fulger.json",
         ];
-
-        for entry in expected_entries {
+        for entry in expected_rp_entries {
             assert!(
-                archive.by_name(entry).is_ok(),
-                "Missing expected .mcaddon zip entry: {entry}"
+                rp_archive.by_name(entry).is_ok(),
+                "Missing expected RP .mcpack entry: {entry}"
+            );
+        }
+
+        let expected_bp_entries = [
+            "manifest.json",
+            "pack_icon.png",
+            "items/sabia_de_fulger.json",
+            "scripts/main.js",
+        ];
+        for entry in expected_bp_entries {
+            assert!(
+                bp_archive.by_name(entry).is_ok(),
+                "Missing expected BP .mcpack entry: {entry}"
             );
         }
 
         // Verify rarity color code in ro_RO.lang
         let mut ro_lang = String::new();
-        archive
-            .by_name("RP/texts/ro_RO.lang")
+        rp_archive
+            .by_name("texts/ro_RO.lang")
             .unwrap()
             .read_to_string(&mut ro_lang)
             .unwrap();
@@ -1107,8 +1204,8 @@ mod tests {
 
         // Verify BP/RP UUID cross-linking and min_engine_version [1, 20, 80]
         let mut bp_manifest_raw = String::new();
-        archive
-            .by_name("BP/manifest.json")
+        bp_archive
+            .by_name("manifest.json")
             .unwrap()
             .read_to_string(&mut bp_manifest_raw)
             .unwrap();
@@ -1116,8 +1213,8 @@ mod tests {
         assert_eq!(bp_val["header"]["min_engine_version"], json!([1, 20, 80]));
 
         let mut script_raw = String::new();
-        archive
-            .by_name("BP/scripts/main.js")
+        bp_archive
+            .by_name("scripts/main.js")
             .unwrap()
             .read_to_string(&mut script_raw)
             .unwrap();
@@ -1167,30 +1264,56 @@ mod tests {
             .expect("export 2D food .mcaddon");
         assert!(written_path.to_string_lossy().ends_with(".mcaddon"));
 
-        let file = File::open(&written_path).expect("open zip");
-        let mut archive = ZipArchive::new(file).expect("valid zip");
+        let file = File::open(&written_path).expect("open .mcaddon zip");
+        let mut addon_archive = ZipArchive::new(file).expect("valid .mcaddon zip");
 
-        assert!(archive.by_name("RP/textures/items/mar_magic.png").is_ok());
-        assert!(archive.by_name("BP/items/mar_magic.json").is_ok());
+        let mut rp_bytes = Vec::new();
+        addon_archive
+            .by_name("mar_magic_rp.mcpack")
+            .unwrap()
+            .read_to_end(&mut rp_bytes)
+            .unwrap();
+        let mut rp_archive = ZipArchive::new(std::io::Cursor::new(rp_bytes)).unwrap();
+
+        let mut bp_bytes = Vec::new();
+        addon_archive
+            .by_name("mar_magic_bp.mcpack")
+            .unwrap()
+            .read_to_end(&mut bp_bytes)
+            .unwrap();
+        let mut bp_archive = ZipArchive::new(std::io::Cursor::new(bp_bytes)).unwrap();
+
+        assert!(rp_archive.by_name("manifest.json").is_ok());
+        assert!(rp_archive.by_name("textures/items/mar_magic.png").is_ok());
+        assert!(bp_archive.by_name("manifest.json").is_ok());
+        assert!(bp_archive.by_name("items/mar_magic.json").is_ok());
         // No powers or status effects -> scripts/main.js and 3D attachable should be omitted
-        assert!(archive.by_name("BP/scripts/main.js").is_err());
-        assert!(archive.by_name("RP/attachables/mar_magic.json").is_err());
+        assert!(bp_archive.by_name("scripts/main.js").is_err());
+        assert!(rp_archive.by_name("attachables/mar_magic.json").is_err());
 
         let mut en_lang = String::new();
-        archive
-            .by_name("RP/texts/en_US.lang")
+        rp_archive
+            .by_name("texts/en_US.lang")
             .unwrap()
             .read_to_string(&mut en_lang)
             .unwrap();
         assert_eq!(en_lang, "item.forjix:mar_magic.name=§bMăr Magic\n");
 
         let mut bp_item_raw = String::new();
-        archive
-            .by_name("BP/items/mar_magic.json")
+        bp_archive
+            .by_name("items/mar_magic.json")
             .unwrap()
             .read_to_string(&mut bp_item_raw)
             .unwrap();
         let item_val: Value = serde_json::from_str(&bp_item_raw).unwrap();
+        assert_eq!(
+            item_val["minecraft:item"]["description"]["menu_category"]["group"],
+            json!("minecraft:itemGroup.name.crop")
+        );
+        assert_eq!(
+            item_val["minecraft:item"]["components"]["minecraft:icon"]["textures"]["default"],
+            json!("forjix_mar_magic")
+        );
         assert_eq!(
             item_val["minecraft:item"]["components"]["minecraft:food"]["nutrition"],
             json!(14)

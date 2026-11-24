@@ -70,7 +70,7 @@ Forged creations export directly to **Minecraft Bedrock Edition**, **Minecraft E
 ### Native Rust Multi-Edition Export Engine & Local `.forjix.json` Library
 - **Save & Reopen Projects**: Native OS file dialogs (`tauri-plugin-dialog`) + Rust `std::fs` persistence (`save_forjix_project`, `load_forjix_project`) for `.forjix.json` item files.
 - **Minecraft Bedrock & Minecraft Education (`.mcaddon`)**:
-  - Cross-linked Behavior Pack (`BP/`) & Resource Pack (`RP/`) `manifest.json` files (`min_engine_version: [1, 20, 80]`) with fresh `v4` UUIDs.
+  - Bundles cross-linked Behavior Pack (`<slug>_bp.mcpack`) & Resource Pack (`<slug>_rp.mcpack`) archives at the `.mcaddon` root, each with a root `manifest.json` (`min_engine_version: [1, 20, 80]`) and fresh `v4` UUIDs.
   - RGBA item PNGs via the Rust `image` crate, `en_US.lang` / `ro_RO.lang` rarity color prefixes (`§f`, `§b`, `§d`, `§6`), and 3D greedy cuboid meshing (`models/entity/<slug>.geo.json` + bleed-proof UV atlas + `attachables/<slug>.json`).
   - Wearable & enchantable armor slot components, right-click cooldowns, and clean `@minecraft/server` `scripts/main.js` generation for `entityHitEntity`, `itemUse`, `system.runInterval`, and `itemCompleteUse`.
 - **Minecraft Java Edition 1.21+ (`_java_resourcepack.zip` + `_java_datapack.zip`)**:
